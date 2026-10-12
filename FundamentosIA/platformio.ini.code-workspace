@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "platformio",
+			"path": "../../../PlatformIO/Projects/platformio"
+		},
+		{
+			"name": "Fundamentos de IA",
+			"path": "../Fundamentos de IA"
+		}
+	],
+	"settings": {}
+}
