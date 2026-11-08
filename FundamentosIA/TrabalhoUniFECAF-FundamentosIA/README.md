@@ -1,164 +1,278 @@
-# Projeto Rota Inteligente — Restaurante Sabor Express
+# 🚚 SABOR EXPRESS — Rota Inteligente
 
-Tema: Otimização de entregas utilizando Inteligência Artificial, algoritmos de busca em grafos e agrupamento de dados.
+**Otimização de entregas com algoritmos de Inteligência Artificial**
 
-## 1. Descrição do problema, desafio proposto e objetivos
+**Autor:** Henrique Ribeiro Siqueira  
+**Instituição:** UniFECAF  
+**Curso:** Ciência da Computação — 6º semestre  
+**Disciplina:** Fundamentos de Inteligência Artificial  
+**Data do projeto:** 02/11/2026
 
-O restaurante Sabor Express enfrenta desafios relacionados à organização e à eficiência das entregas de pedidos. Com o aumento da demanda, torna-se necessário planejar rotas que permitam aos entregadores atender vários clientes, reduzindo o tempo de deslocamento, o consumo de combustível e os custos operacionais.
 
-O principal problema está na definição das melhores rotas de entrega. Quando o planejamento é realizado manualmente ou sem critérios de otimização, os entregadores podem percorrer distâncias desnecessárias, enfrentar atrasos e realizar trajetos pouco eficientes.
 
-### Desafio proposto
 
-Desenvolver um sistema inteligente em Python capaz de calcular rotas otimizadas, agrupar pedidos próximos geograficamente e organizar múltiplas entregas utilizando algoritmos de Inteligência Artificial.
+## 1. Descrição do problema
+
+O restaurante fictício **Sabor Express** precisa distribuir pedidos por diferentes regiões de uma cidade. Rotas montadas manualmente podem gerar deslocamentos desnecessários, atrasos e desequilíbrio entre entregadores. A malha urbana inclui restrições reais de circulação, como vias de mão única, uma rua interditada e um rio atravessável somente por duas pontes.
+
+**Desafio:** planejar a distribuição e a ordem de atendimento de **18 pedidos** entre **3 entregadores**, com **até 6 pedidos por entregador**, minimizando o tempo de deslocamento e avaliando o cumprimento de um prazo de **60 minutos** para chegada ao cliente.
 
 ### Objetivos
 
-- Encontrar os caminhos de menor custo entre o restaurante e os clientes.
-- Agrupar pedidos próximos utilizando K-Means.
-- Aplicar algoritmos de busca, como A\*, BFS e DFS.
-- Reduzir a distância total percorrida pelos entregadores.
-- Comparar o desempenho dos algoritmos utilizados.
-- Visualizar rotas, pontos de entrega e métricas em uma interface Streamlit.
-- Melhorar a eficiência operacional e a qualidade do serviço.
+- Modelar a cidade como um **grafo dirigido e ponderado**.
+- Encontrar caminhos de menor tempo entre loja e clientes com **A\***.
+- Agrupar clientes geograficamente com **K-Means++**, respeitando a capacidade por meio de reparo posterior.
+- Ordenar as visitas usando **vizinho mais próximo (NN)** e refinar cada rota com **2-opt**.
+- Comparar três estratégias de planejamento por métricas reproduzíveis.
 
-## 2. Explicação detalhada da abordagem adotada
 
-A solução proposta utiliza uma abordagem híbrida, combinando algoritmos de busca em grafos, técnicas de agrupamento e otimização de rotas.
 
-### Fluxo de funcionamento do sistema
+## 2. Cenário e parâmetros
 
-1\. Cadastro dos pedidos
+| Parâmetro | Valor no código |
+|---|---|
+| Malha urbana | Grade 7 × 7, total de **49 nós** (IDs 0 a 48) |
+| Coordenadas | `XY[7*y+x] = (0.5*x, 0.5*y)` em km |
+| Loja | Nó **24**, centro da grade |
+| Pedidos | **18** nós distintos da loja, amostrados com semente 42 |
+| Entregadores / grupos | `K = 3` |
+| Capacidade por entregador | `CAP = 6` pedidos |
+| Tempo de serviço | `SERVICO = 2` minutos por entrega |
+| Prazo de chegada | `PRAZO = 60` minutos |
+| Velocidade de referência | `VMAX = 40` km/h |
+| Distância por rua | **0,5 km** |
+| Aleatoriedade da cidade | Semente fixa `2026` |
+| Inicialização do agrupamento | Semente fixa `42`, 10 tentativas |
 
-Localização dos clientes e informações das entregas
+> **Observação:** todos os dados são simulados. O modelo não usa GPS, mapas reais, previsão de trânsito ou pedidos de um restaurante real.
 
-2\. Construção do grafo
 
-Ruas, cruzamentos, distâncias e conexões
 
-3\. Agrupamento K-Means
+## 3. Abordagem adotada
 
-Divisão dos pedidos por proximidade geográfica
 
-4\. Busca e otimização de rotas
+### 3.1. Construção da cidade — `cidade()`
 
-A\*, BFS, DFS e definição da sequência de entregas
+A função cria um dicionário de adjacência: cada nó representa um cruzamento e cada aresta representa um trecho de rua. As arestas guardam `(destino, minutos, quilômetros)`. O código considera quatro direções ortogonais, respeitando os limites da grade.
 
-5\. Visualização e avaliação
+Restrições implementadas:
 
-Streamlit, rotas calculadas e indicadores de desempenho
+1. **Rio:** as ligações horizontais entre as colunas 3 e 4 são removidas, exceto nas linhas 1 e 5 (duas pontes).
+2. **Mão única:** na linha 2, deslocamentos para a esquerda são proibidos; na linha 4, deslocamentos para a direita são proibidos.
+3. **Interdição:** a ligação vertical entre os nós **17 e 24** é removida nos dois sentidos.
+4. **Congestionamento simulado:** trechos no interior da região de coordenadas de grade `1 ≤ x ≤ 5` e `1 ≤ y ≤ 5` recebem fator `1.65`; os demais recebem `1.1`. Cada aresta também recebe fator pseudoaleatório entre `1` e `1.45`.
 
-O processo começa com o cadastro dos pedidos e suas respectivas localizações. Essas informações são representadas em um grafo, no qual os vértices representam o restaurante, os clientes e os cruzamentos, enquanto as arestas representam as conexões entre esses pontos.
+O tempo de uma aresta é calculado por:
 
-Em seguida, o algoritmo K-Means agrupa os clientes conforme sua proximidade geográfica. Isso permite distribuir os pedidos entre diferentes entregadores.
+```text
+tempo_min = (60 × 0,5 / 40) × fator_regional × fator_aleatorio
+```
 
-Após o agrupamento, o algoritmo A\* identifica os caminhos de menor custo entre os pontos. Uma etapa adicional determina a melhor ordem para visitar os clientes, evitando deslocamentos desnecessários.
+O comprimento de cada trecho permanece em **0,5 km**, independentemente do tempo de viagem.
 
-Por fim, o sistema apresenta os resultados em uma interface desenvolvida com Streamlit, permitindo visualizar as rotas e analisar indicadores de desempenho.
 
-## 3. Algoritmos utilizados
+### 3.2. Menores caminhos — `astar(grafo, origem, destino)`
 
-| Algoritmo                        | Aplicação no Sabor Express                                                 |
-| -------------------------------- | -------------------------------------------------------------------------- |
-| A (A-estrela)\*                  | Encontrar caminhos de menor custo usando uma heurística de distância.      |
-| BFS (Busca em Largura)           | Encontrar caminhos com o menor número de arestas em grafos não ponderados. |
-| DFS (Busca em Profundidade)      | Explorar caminhos e verificar a conectividade do grafo.                    |
-| K-Means                          | Agrupar clientes próximos e auxiliar na distribuição de entregas.          |
-| Otimização de múltiplas entregas | Definir a sequência de visitas para minimizar o custo total da rota.       |
+O **A\*** encontra o caminho com menor **tempo estimado de viagem** entre dois nós. Utiliza uma fila de prioridade (`heapq`), os melhores custos conhecidos e predecessores para reconstruir o trajeto.
 
-### Algoritmo A\*
+A heurística é a distância euclidiana em linha reta dividida pela velocidade de referência:
 
-O A\* utiliza a função:
+```text
+h(n) = 60 × distancia_euclidiana(XY[n], XY[destino]) / VMAX
+```
 
-\\[ f(n)=g(n)+h(n) \\]
+Como cada trecho tem tempo não inferior ao tempo de percorrê-lo a 40 km/h, essa heurística é **admissível**; assim, o A\* encontra o menor tempo no grafo modelado. A função devolve `(tempo_min, distancia_km, caminho)` e gera erro se o destino for inalcançável.
 
-Em que:
+Uma **matriz de custos** é pré-calculada para os 19 terminais (loja + 18 pedidos). Cada par ordenado recebe sua própria consulta A\*, pois a rede é **dirigida** e, portanto, o tempo de `A → B` pode ser diferente de `B → A`.
 
-- \\(g(n)\\): custo acumulado desde o ponto inicial.
-- \\(h(n)\\): estimativa do custo restante até o destino.
-- \\(f(n)\\): custo total estimado.
 
-O A\* pode garantir o caminho ótimo quando a heurística é admissível e as demais condições do algoritmo são atendidas.
+### 3.3. Agrupamento — `agrupar(pedidos)`
 
-### Algoritmo K-Means
+O código implementa uma versão de **K-Means com inicialização K-Means++**:
 
-O K-Means organiza os clientes em grupos, minimizando a soma das distâncias quadráticas entre cada ponto e o centro de seu grupo.
+1. Sorteia o primeiro centro e escolhe os seguintes proporcionalmente ao quadrado da distância ao centro mais próximo.
+2. Atribui cada pedido ao centro euclidiano mais próximo.
+3. Recalcula os centroides; trata grupos vazios transferindo pontos de grupos com mais de um elemento.
+4. Repete até estabilizar as atribuições ou atingir 100 iterações.
+5. Executa 10 inicializações e seleciona a de menor **SSE** (*soma dos quadrados das distâncias aos centroides*).
+6. **Repara a capacidade**: enquanto algum grupo tiver mais de 6 pedidos, transfere pedidos para grupos com vagas, escolhendo a transferência de menor aumento da SSE.
 
-\\[ J=\sum\_{i=1}^{k}\sum\_{x\in C_i}\\|x-\mu_i\\|^2 \\]
+**Importante:** o agrupamento considera **distância euclidiana**, não os tempos reais do grafo. O reparo de capacidade é uma etapa adicional: o K-Means isolado não garante grupos de mesmo tamanho.
 
-Em que \\(k\\) representa a quantidade de grupos, \\(C_i\\) representa os clientes do grupo e \\(\mu_i\\) seu centroide.
+### 3.4. Ordenação das entregas — `otimizar(grupo, pedidos, matriz)`
 
-O agrupamento geográfico é uma etapa inicial: a atribuição definitiva das entregas também deve considerar capacidade dos entregadores e distâncias reais pelas ruas.
+**Vizinho mais próximo (NN):** parte da loja e seleciona repetidamente o pedido ainda não visitado com menor tempo de deslocamento desde o ponto atual.
 
-## 4. Diagrama do grafo utilizado na solução
+**2-opt:** avalia inversões de segmentos da sequência de entregas. Para cada candidata, recalcula o **custo completo da rota**, incluindo a volta à loja e respeitando os sentidos das ruas. Aceita a melhor melhoria e repete até não haver redução adicional de tempo.
 
-O diagrama abaixo representa um cenário ilustrativo do restaurante Sabor Express com seis clientes e diferentes conexões de entrega.
+A otimização é **heurística**, portanto não garante a melhor rota global. O tempo de serviço é constante por entrega e não altera a comparação entre permutações do mesmo grupo.
 
-Restaurante
 
-Conexões
 
-Clientes
+## 4. Algoritmos utilizados
 
-Nesse modelo, o restaurante é representado pelo vértice R. Os pontos A e B funcionam como conexões intermediárias, enquanto C, D, E e F representam destinos de entrega.
+| Algoritmo / técnica | Função no projeto | Característica |
+|---|---|---|
+| **A\*** | Menor caminho entre terminais | Busca informada por heurística admissível |
+| **K-Means++ / K-Means** | Formação de 3 grupos geográficos | Clustering com múltiplas inicializações |
+| **Reparo por SSE** | Respeitar limite de 6 pedidos | Realocação gulosa entre grupos |
+| **Nearest Neighbor (NN)** | Construção da ordem inicial de visitas | Heurística gulosa |
+| **2-opt** | Melhoria da ordem das visitas | Busca local por reversão de segmentos |
 
-As arestas possuem pesos associados ao custo de deslocamento. Esses pesos podem representar distâncias, tempos ou outros custos, desde que sejam utilizados de maneira consistente.
+**BFS e DFS não são usados nesta implementação.** Eles são algoritmos possíveis de travessia de grafos, mas não substituem diretamente o A\* para minimizar tempos em uma rede com pesos diferentes.
 
-Por exemplo, para alcançar o cliente E, o A\* pode selecionar o caminho R → B → E, cujo custo ilustrativo é \\(4+2=6\\).
 
-## 5. Análise dos resultados e eficiência da solução
 
-Como não foram fornecidas medições de uma execução real do projeto, a tabela abaixo apresenta uma simulação ilustrativa, utilizada para demonstrar como os resultados podem ser avaliados.
+## 5. Diagramas do modelo
 
-| Indicador            | Sem otimização | Com otimização | Melhoria |
-| -------------------- | -------------- | -------------- | -------- |
-| Distância total      | 40 km          | 29 km          | 27,5%    |
-| Tempo total          | 120 min        | 90 min         | 25%      |
-| Consumo estimado     | 2,0 L          | 1,45 L         | 27,5%    |
-| Custo de combustível | R$ 12,00       | R$ 8,70        | 27,5%    |
 
-Comparação ilustrativa da distância percorrida
+### 5.1. Fluxo da solução
 
-Distância total em quilômetros
+```mermaid
+flowchart TD
+    A[Gerar cidade: 49 nós] --> B[Gerar 18 pedidos]
+    B --> C[Calcular matriz com A*]
+    C --> D{Estratégia}
+    D --> E[Manual: distribuição por índice]
+    D --> F[Manual + NN + 2-opt]
+    D --> G[K-Means++ e reparo de capacidade]
+    G --> H[NN + 2-opt por grupo]
+    E --> I[Avaliar rotas]
+    F --> I
+    H --> I
+    I --> J[Comparar tempo, km, retornos e pontualidade]
+```
 
-0 km15 km30 km45 kmSem otimizaçãoCom otimização
 
-Os valores simulados indicam que a combinação dos algoritmos pode reduzir os deslocamentos e os custos operacionais. Entretanto, a economia efetiva precisa ser validada com pedidos reais, distâncias rodoviárias e condições de trânsito.
+### 5.2. Esquema da grade e travessias
 
-### Eficiência dos algoritmos
+O esquema abaixo mostra os **IDs dos nós** da grade. As arestas reais são criadas pela função `cidade()` e têm restrições de direção e interdição descritas acima.
 
-O A\* tende a ser mais eficiente que buscas sem heurística em problemas de caminhos mínimos quando utiliza uma estimativa informativa. O BFS é útil em grafos não ponderados, enquanto o DFS permite explorar a conectividade, mas não garante o caminho de menor custo.
+```text
+ y=0    00 — 01 — 02 — 03   ║   04 — 05 — 06
+ y=1    07 — 08 — 09 — 10 — P — 11 — 12 — 13
+ y=2    14 — 15 — 16 — 17   ║   18 — 19 — 20
+ y=3    21 — 22 — 23 — 24   ║   25 — 26 — 27
+ y=4    28 — 29 — 30 — 31   ║   32 — 33 — 34
+ y=5    35 — 36 — 37 — 38 — P — 39 — 40 — 41
+ y=6    42 — 43 — 44 — 45   ║   46 — 47 — 48
 
-O K-Means facilita a organização das entregas, embora não garanta que os grupos produzam as melhores rotas viárias.
+║ = rio (sem passagem horizontal)
+P = ponte nas linhas 1 e 5
+Loja = nó 24
+```
 
-## 6. Limitações encontradas
+> Diagrama **conceitual**, não mapa de adjacência completo: as conexões verticais, sentidos únicos e pesos estão definidos no código. O marcador `P` indica a travessia entre as colunas 3 e 4 e não é um nó adicional.
 
-Entre as principais limitações da solução proposta estão:
 
-- Trânsito em tempo real: o modelo pode não considerar congestionamentos, acidentes e interdições.
-- Distância geográfica: a proximidade em linha reta não representa necessariamente a menor distância pelas ruas.
-- Capacidade dos entregadores: o agrupamento precisa considerar quantos pedidos cada entregador consegue transportar.
-- Escalabilidade: o aumento do número de clientes torna a otimização combinatória mais complexa.
-- Dados simulados: resultados obtidos com cenários artificiais podem não refletir o desempenho real do restaurante.
 
-## 7. Sugestões de melhoria
+## 6. Estratégias comparadas
 
-Para aprimorar o sistema Sabor Express, recomenda-se integrar APIs de mapas, como Google Maps ou OpenStreetMap, para trabalhar com redes viárias reais.
+| Estratégia | Distribuição | Ordenação |
+|---|---|---|
+| **Manual** | Índices `0,3,6...`, `1,4,7...`, `2,5,8...` | Ordem original dos pedidos |
+| **NN + 2-opt** | Mesmos grupos da estratégia manual | NN seguido de 2-opt |
+| **K-Means + NN + 2-opt** | K-Means++ com reparo de capacidade | NN seguido de 2-opt |
 
-Também seria interessante utilizar bibliotecas de otimização, como Google OR-Tools, para resolver o Problema de Roteamento de Veículos (VRP), considerando múltiplos entregadores, capacidade e restrições de tempo.
+As três estratégias são avaliadas sobre **a mesma cidade e os mesmos 18 pedidos**, permitindo comparação justa dentro da simulação.
 
-Outra melhoria seria incorporar modelos de Machine Learning para prever a duração das entregas com base no horário, região, distância e histórico de pedidos.
 
-Por fim, a interface Streamlit poderia apresentar mapas interativos, relatórios de desempenho e comparações entre rotas planejadas e efetivamente realizadas.
 
-## 8. Conclusão
+## 7. Métricas e análise dos resultados
 
-O projeto Rota Inteligente — Sabor Express demonstra como técnicas de Inteligência Artificial podem ser aplicadas à otimização logística de um restaurante.
+A função `avaliar()` valida se cada pedido aparece exatamente uma vez e se nenhum grupo excede a capacidade. Em seguida, calcula:
 
-A combinação dos algoritmos A\*, BFS, DFS e K-Means permite estruturar uma solução capaz de representar a rede de entregas, explorar caminhos, agrupar clientes e apoiar a escolha de rotas mais eficientes.
+| Métrica | Interpretação | Direção desejada |
+|---|---|---|
+| `viagem (min)` | Soma dos tempos de deslocamento de todos os entregadores, inclusive retornos | Menor |
+| `km` | Soma das distâncias percorridas por todos os entregadores | Menor |
+| `último retorno` | Maior duração individual entre os entregadores, incluindo serviço e retorno à loja | Menor |
+| `entrega média` | Média dos instantes de chegada aos 18 clientes, contados a partir de zero para cada entregador | Menor |
+| `pontualidade` | Percentual de pedidos cuja chegada ocorre até 60 minutos | Maior |
 
-A principal contribuição do projeto está na possibilidade de transformar o planejamento manual em um processo automatizado, orientado por dados e indicadores de desempenho.
+A duração de cada entregador soma **deslocamento + 2 minutos de serviço por pedido + retorno**. Já a chegada de cada cliente é registrada **antes** dos seus 2 minutos de serviço.
 
-Embora existam limitações relacionadas ao trânsito, à capacidade operacional e à qualidade dos dados, a solução apresenta potencial para reduzir custos, melhorar a produtividade dos entregadores e aumentar a satisfação dos clientes.
+### Como interpretar os resultados
 
-Assim, o Sabor Express constitui uma aplicação prática dos conceitos de grafos, algoritmos de busca, agrupamento e otimização estudados em Inteligência Artificial.
+Execute o script para obter os **valores numéricos reais da simulação**. O programa imprime uma linha por estratégia e a sequência de pedidos de cada entregador (`P01`, `P02` etc.). Não há valores fixos inventados neste README.
+
+Em geral, é esperado que **NN + 2-opt** não aumente o tempo de viagem dos grupos manuais, pois o 2-opt só aceita melhorias e a rota inicial do NN pode ser diferente da manual. **Não é garantido** que NN + 2-opt supere a estratégia manual em toda instância: NN pode começar com uma ordem pior e o 2-opt pode parar em um ótimo local. O **K-Means + NN + 2-opt** também não tem garantia de superar os outros métodos, porque o agrupamento otimiza proximidade geométrica, não diretamente o tempo de rota no grafo.
+
+
+
+## 8. Eficiência computacional
+
+- **A\*:** depende da quantidade de nós e arestas; com fila de prioridade, uma busca tem custo típico da ordem de `O((V + E) log V)` sob hipóteses usuais. Nesta grade há `V = 49` e um número limitado de arestas.
+- **Matriz:** são executadas `19 × 19 = 361` consultas A\*, incluindo os pares de origem e destino iguais. Esse pré-cálculo evita buscas repetidas durante a otimização.
+- **K-Means:** com `n = 18`, `K = 3`, 10 inicializações e até 100 iterações por inicialização, o custo é pequeno para a simulação. O reparo de capacidade avalia mudanças de SSE.
+- **NN:** faz escolhas sucessivas entre pedidos restantes, com custo aproximado de `O(m²)` para um grupo de `m` pedidos.
+- **2-opt:** testa `O(m²)` reversões por rodada; como o custo de cada rota é recalculado em `O(m)`, a implementação tem custo `O(m³)` por rodada. O número de rodadas depende das melhorias encontradas.
+
+Como cada entregador atende no máximo **6 pedidos**, a busca local é viável neste cenário. **Não foram medidos tempo de CPU ou consumo de memória**, portanto não se atribuem números de desempenho computacional sem teste.
+
+
+
+## 9. Limitações
+
+1. **Cidade artificial:** a grade não representa uma rede viária real.
+2. **Trânsito estático:** os tempos das arestas são sorteados uma vez e não variam durante a entrega.
+3. **Pedidos sem demanda variável:** todos ocupam uma unidade de capacidade; não há peso ou volume.
+4. **K-Means geométrico:** os agrupamentos não consideram mão única, pontes ou congestionamento.
+5. **Capacidade rígida:** o reparo depende da existência de vagas; a implementação foi dimensionada para 18 pedidos e capacidade total de 18.
+6. **Prazo apenas avaliado:** os 60 minutos não são impostos como restrição durante a otimização.
+7. **Heurísticas sem ótimo global garantido:** NN e 2-opt podem parar em soluções subótimas.
+8. **Sem custo monetário:** combustível, salários e emissões não entram na função objetivo.
+9. **Sem visualização cartográfica interativa:** a versão fornecida é executada pelo terminal.
+
+
+
+## 10. Sugestões de melhoria
+
+- Usar **OpenStreetMap/OSMnx** para obter ruas reais e limites de velocidade.
+- Substituir o agrupamento euclidiano por **agrupamento baseado em tempos de viagem**.
+- Aplicar algoritmos para **CVRP/VRPTW** (roteamento de veículos com capacidade e janelas de tempo), como OR-Tools, com restrições explícitas de prazo.
+- Considerar **trânsito dinâmico**, pedidos novos, disponibilidade de entregadores e replanejamento.
+- Experimentar **simulated annealing, busca tabu, algoritmos genéticos** ou otimização exata para comparação.
+- Criar interface **Streamlit**, mapa interativo e gráficos das métricas.
+- Executar **múltiplas sementes e cenários** para calcular médias, dispersão e robustez das melhorias.
+- Medir tempo de processamento e memória, além de distância, pontualidade e tempo de viagem.
+
+
+
+## 11. Como executar
+
+**Requisito:** Python 3.8 ou superior. O código utiliza somente a biblioteca padrão (`heapq`, `math`, `random`, `statistics`), sem dependências externas.
+
+1. Salve o código fornecido como `sabor_express.py`.
+2. Abra um terminal na pasta do arquivo.
+3. Execute:
+
+```bash
+python sabor_express.py
+```
+
+No Windows, caso o comando `python` não esteja disponível, tente `py sabor_express.py`.
+
+**Saída esperada (estrutura, não valores simulados):**
+
+```text
+Método | viagem(min) | km | último retorno | entrega média | pontualidade
+Manual | ... | ... | ... | ... | ...
+  E1: loja -> P... -> loja
+  E2: loja -> P... -> loja
+  E3: loja -> P... -> loja
+NN + 2-opt | ...
+  ...
+K-Means + NN + 2-opt | ...
+  ...
+```
+
+Os geradores com sementes fixas tornam os resultados reproduzíveis em condições equivalentes de execução.
+
+
+
+## 12. Conclusão
+
+O projeto integra **representação por grafos, busca heurística, clustering e otimização combinatória** em um problema de logística urbana. O A\* calcula caminhos que respeitam as restrições da cidade; o K-Means++ organiza os pedidos por proximidade, com ajuste de capacidade; e NN + 2-opt determina sequências de visita e procura reduzir o tempo total de viagem. A comparação com uma distribuição manual permite avaliar empiricamente os benefícios e as limitações de cada estratégia, sem presumir que a combinação mais complexa seja sempre a melhor.
+
+---
