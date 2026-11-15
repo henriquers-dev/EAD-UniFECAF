@@ -1,4 +1,4 @@
-# **----- OBSERVAÇÕES -----**
+#----- OBSERVAÇÕES -----
 
 # Registro de preservação do firmware original (Etapa 2)
 # Preencha um bloco por arquivo. Não altere o arquivo original.
