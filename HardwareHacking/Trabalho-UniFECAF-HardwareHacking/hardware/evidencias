@@ -1,1 +1,8 @@
+# Evidência de hardware - UART (modelo)
+# Data      : <AAAA-MM-DD>
+# Dispositivo: <NexaHome - modelo/versão>
+# Conexão   : <porta, ex.: /dev/ttyUSB0 ou COM3> | baud rate: <ex.: 115200>
+# Comando   : <ex.: picocom -b 115200 /dev/ttyUSB0 | tee uart-boot-log.txt>
+# Observação: substitua senhas, tokens e chaves reais por [REDACTED]
 
+--- cole abaixo a saída capturada ---
