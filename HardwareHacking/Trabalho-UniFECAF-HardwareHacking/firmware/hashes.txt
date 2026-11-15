@@ -1,15 +1,20 @@
-#----- OBSERVAÇÕES -----
+# ----- OBSERVAÇÕES -----
+
+
+
 
 # Registro de preservação do firmware original (Etapa 2)
 # Preencha um bloco por arquivo. Não altere o arquivo original.
 # Para gerar o hash:  sha256sum nome-do-arquivo.bin   (Linux/Mac)
 #                     certutil -hashfile nome-do-arquivo.bin SHA256   (Windows)
 
+
 Nome do arquivo : <ex.: nexahome-fw-v1.0.bin>
 Tamanho         : <ex.: 1048576 bytes>
 Origem          : <ex.: fornecido pelo EAD / extraído do dispositivo em laboratório>
 Data da análise : <2026-11-15>
 SHA-256         : <cole aqui o hash de 64 caracteres>
+
 
 # Cópia de trabalho (deve ter o mesmo hash do original)
 Nome da cópia   : <ex.: nexahome-fw-v1.0-work.bin>
