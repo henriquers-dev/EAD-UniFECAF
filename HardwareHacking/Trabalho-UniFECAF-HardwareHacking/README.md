@@ -4,8 +4,6 @@
 > **Nome:** Henrique Ribeiro Siqueira
 > **Classificação:** [Confidencial]
 
-> ⚠️ **Aviso:** os testes descritos neste documento foram realizados **exclusivamente em ambiente autorizado** e sobre dispositivos de propriedade do cliente ou cedidos para este fim. Não reproduza estes procedimentos em equipamentos ou redes sem autorização formal por escrito.
-
 ---
 
 ## Sumário
